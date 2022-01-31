@@ -8,7 +8,7 @@ async function doesEntryHaveSleep(entryId) {
     const response = await notion.pages.retrieve({
         page_id: entryId
     });
-    return response.properties.hasOwnProperty("Time in Bed") && response.properties["Time in Bed"].date.start.length !== 0 && response.properties["Time in Bed"].date.end.length !== 0;
+    return response.properties.hasOwnProperty("Time in Bed") && response.properties["Time in Bed"].date !== null && response.properties["Time in Bed"].date.start.length !== 0 && response.properties["Time in Bed"].date.end.length !== 0;
 }
 
 async function getEntriesForDate(date) {
@@ -164,5 +164,6 @@ export {
     completeTasks,
     setSleepTime,
     updateLifeWikiDayStrategy,
-    updateDayStrategy
+    updateDayStrategy,
+    getChildBlocks
 }
