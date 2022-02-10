@@ -1,5 +1,5 @@
 
-import {updateDayStrategy, getEntriesForDate, createEntryForDate, completeTasks, setSleepTime, doesEntryHaveSleep, updateLifeWikiDayStrategy } from './notion_api.js'
+import {appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, completeRoutines, setSleepTime, doesEntryHaveSleep, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
 import { currentDateWithOffset, addTimezoneOffset, millisecsPerDay, millisecsPerHour } from './date_format.js';
 import { createInterface } from 'readline';
 import _yargs from 'yargs';
@@ -28,26 +28,26 @@ const argv = yargs
         type: 'string',
         default: '',
     })
-    .option('tasksdone', {
-        alias: 't',
+    .option('routine', {
+        alias: 'r',
         demandOption: false,
-        describe: 'tasks done',
+        describe: 'Mark a routine as completed for the day',
         type: 'array',
         default: [],
     })
-    // .option('plan', {
-    //     alias: 'p',
-    //     demandOption: false,
-    //     describe: "Strategy for the day",
-    //     type: "string",
-    //     default: "",
-    // })
     .option('plan', {
         alias: 'p',
         demandOption: false,
         describe: "Set strategy for the day",
         type: "boolean",
         default: false
+    })
+    .option('tasks', {
+        alias: 't',
+        demandOption: false,
+        describe: "Mark a task as worked on for the day (format: `task,time`)",
+        type: "array",
+        default: [],
     })
     .argv
 
@@ -86,13 +86,22 @@ const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(ar
 const dayEntries = await getEntriesForDate(currDate);
 const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate);
 
+
+// print the blocks
+
+// const newDayTemplateId = process.env.NOTION_NEWDAY_TEMPLATE_ID
+// const newDayTemplateChildBlocks = await getChildBlocks(newDayTemplateId);
+// const newDayTemplateTableBlock = newDayTemplateChildBlocks[3];
+
+
+
 if (argv.sleep !== '') {
     populateEntryWithSleep(argv.sleep, argv.wake, currDate, dayEntry.id)
 } else {
     if (!await doesEntryHaveSleep(dayEntry.id)) {
         const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time, append y to end if it was yesterday)');
         const waketimeString = await getUserInput('when did you wake up?');
-        populateEntryWithSleep(bedtimeString, waketimeString, dayEntry.id);
+        populateEntryWithSleep(bedtimeString, waketimeString, currDate, dayEntry.id);
     }
 }
 
@@ -102,6 +111,22 @@ if (argv.plan) {
     updateDayStrategy(dayEntry.id, plan);
 }
 
-if (argv.tasksdone.length > 0) {
-    completeTasks(argv.tasksdone, dayEntry.id);
+if (argv.routine.length > 0) {
+    completeRoutines(argv.routine, dayEntry.id);
+}
+
+if (argv.tasks.length > 0) {
+    const dayEntryChildBlocks = await getChildBlocks(dayEntry.id);
+    const dayEntryTableBlock = dayEntryChildBlocks[3];
+    const newTaskBlockChildren = argv.tasks.map(task => {
+        // const [taskName, taskTime] = task.split(",");
+        return {
+            "object": "block",
+            "type": "table_row",
+            "table_row": {
+                "cells": task.split(",").map(taskComponent => [{"type": "text", "text": {"content": taskComponent}}])
+            }
+        }
+    });
+    appendChildBlocks(dayEntryTableBlock.id, newTaskBlockChildren);
 }
