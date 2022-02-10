@@ -78,22 +78,12 @@ async function populateEntryWithSleep(bedtimeString, waketimeString, currDate, e
     await setSleepTime(sleepDate, wakeDate, entryId);
 }
 
-
-
-// const currDate = (argv.date === '') ? new Date(currentDateWithOffset) : addTimezoneOffset(new Date(argv.date));
-
 const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
 const dayEntries = await getEntriesForDate(currDate);
 const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate);
 
 
 // print the blocks
-
-// const newDayTemplateId = process.env.NOTION_NEWDAY_TEMPLATE_ID
-// const newDayTemplateChildBlocks = await getChildBlocks(newDayTemplateId);
-// const newDayTemplateTableBlock = newDayTemplateChildBlocks[3];
-
-
 
 if (argv.sleep !== '') {
     populateEntryWithSleep(argv.sleep, argv.wake, currDate, dayEntry.id)
