@@ -87,8 +87,6 @@ function makeRoutineProps(routines) {
 }
 
 const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
-const dayEntries = await getEntriesForDate(currDate);
-
 let propUpdates = {};
 if (argv.sleep !== '') {
     propUpdates = { ...propUpdates, ...makeSleepProps(argv.sleep, argv.wake, currDate) };
@@ -97,8 +95,8 @@ if (argv.routine.length > 0) {
     propUpdates = { ...propUpdates, ...makeRoutineProps(argv.routine) };
 }
 
+const dayEntries = await getEntriesForDate(currDate);
 let dayEntry;
-
 if (dayEntries.length !== 0) {
     dayEntry = dayEntries[0];
     if (!doesEntryHaveSleep(dayEntry)) {
