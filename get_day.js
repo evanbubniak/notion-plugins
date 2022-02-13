@@ -1,4 +1,4 @@
-import { getChildBlocks, didWeightsOnDayBefore, getEntriesForDate, createEntryForDate, getAreas, getProjects } from './notion_api.js'
+import { doesEntryHaveSleep, getChildBlocks, didWeightsOnDayBefore, getEntriesForDate, createEntryForDate, getAreas, getProjects } from './notion_api.js'
 import { addTimezoneOffset } from './date_format.js';
 import _yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -16,8 +16,7 @@ const argv = yargs
 const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
 const didWeightsOnDayBeforeDate = await didWeightsOnDayBefore(currDate);
 const dayEntries = await getEntriesForDate(currDate);
-const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate);
-const dayEntryHasSleep = dayEntry.properties.hasOwnProperty("Time in Bed") && dayEntry.properties["Time in Bed"].date !== null && dayEntry.properties["Time in Bed"].date.start.length !== 0 && dayEntry.properties["Time in Bed"].date.end.length !== 0;
+const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate, {});
 const dayEntryChildBlocks = await getChildBlocks(dayEntry.id);
 const areas = await getAreas();
 const projects = await getProjects();
@@ -27,7 +26,7 @@ function getName(page) { return page.properties.Name.title[0].text.content }
 
 console.log(dayEntry.properties.Day.title[0].text.content)
 
-if (dayEntryHasSleep) {
+if (doesEntryHaveSleep(dayEntry)) {
     console.log("Bedtime: " + new Date(Date.parse(dayEntry.properties["Time in Bed"].date.start)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
     console.log("Wake time: " + new Date(Date.parse(dayEntry.properties["Time in Bed"].date.end)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
 } else {

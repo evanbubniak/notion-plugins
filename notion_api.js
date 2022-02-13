@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client"
-import { millisecsPerDay, dateToYYYYMMDD, dateToTitle, getTimezoneFormattedDateStr } from './date_format.js'
+import { millisecsPerDay, dateToYYYYMMDD, dateToTitle } from './date_format.js'
 
 const notion = new Client({ auth: process.env.NOTION_KEY });
 const calendarDatabaseId = process.env.NOTION_CALENDAR_DATABASE_ID;
@@ -8,11 +8,8 @@ const projectsDatabaseId = process.env.NOTION_PROJECTS_DATABASE_ID
 const dayStrategyBlockId = process.env.NOTION_DAYSTRATEGY_BLOCK_ID
 const areasDatabaseId = process.env.NOTION_AREAS_DATABASE_ID
 
-async function doesEntryHaveSleep(entryId) {
-    const response = await notion.pages.retrieve({
-        page_id: entryId
-    });
-    return response.properties.hasOwnProperty("Time in Bed") && response.properties["Time in Bed"].date !== null && response.properties["Time in Bed"].date.start.length !== 0 && response.properties["Time in Bed"].date.end.length !== 0;
+function doesEntryHaveSleep(dayEntry) {
+    return dayEntry.properties.hasOwnProperty("Time in Bed") && dayEntry.properties["Time in Bed"].date !== null && dayEntry.properties["Time in Bed"].date.start.length !== 0 && dayEntry.properties["Time in Bed"].date.end.length !== 0;
 }
 
 async function getEntriesForDate(date) {
@@ -49,7 +46,7 @@ async function appendChildBlocks(blockId, childBlocks) {
 }
 
 async function getNewDayTemplateBlocks() {
-    
+
     return await getChildBlocks(newDayTemplateId);
 }
 
@@ -78,11 +75,11 @@ async function updateBlockToText(blockId, newText) {
     console.log(response);
 }
 
-async function createEntryForDate(date) {
+async function createEntryForDate(date, props) {
     try {
         const childBlocks = await getNewDayTemplateBlocks();
         const strippedChildBlocks = await Promise.all(childBlocks.map(async childBlock => {
-            const {id, ...restOfBlock} = childBlock;
+            const { id, ...restOfBlock } = childBlock;
             if (restOfBlock.type === "table") {
                 const childBlocks = await getChildBlocks(id);
                 restOfBlock.table.children = childBlocks;
@@ -105,7 +102,8 @@ async function createEntryForDate(date) {
                     "date": {
                         "start": dateToYYYYMMDD(date)
                     }
-                }
+                },
+                ...props
             },
             children: strippedChildBlocks
         })
@@ -157,30 +155,13 @@ async function getIdByTitle(title, databaseId) {
     return response.results[0].id
 }
 
-async function completeRoutines(tasks, entryId) {
-    const propertiesObj = tasks.reduce((obj, task) => ({...obj, [task]: {checkbox: true}}), {});
+async function updateProps(entryId, props) {
     const response = await notion.pages.update({
         page_id: entryId,
-        properties: propertiesObj
+        properties: props
     });
     console.log(response);
-}
-
-async function setSleepTime(sleepDate, wakeDate, entryId) {
-    
-    const dateObj = {
-        "start": getTimezoneFormattedDateStr(sleepDate),
-        "end": getTimezoneFormattedDateStr(wakeDate),
-    };
-    const response = await notion.pages.update({
-        page_id: entryId,
-        properties: {
-            "Time in Bed": {
-                "date": dateObj
-            }
-        }
-    });
-    console.log(response);
+    return response;
 }
 
 async function didWeightsOnDayBefore(date) {
@@ -215,20 +196,20 @@ async function getAreas() {
     const response = await notion.databases.query({
         database_id: areasDatabaseId,
         sorts: [
-        {
-            property: "Priority",
-            direction: "ascending"
-        },
-        {
-            property: "Daily Goal",
-            direction: "descending"
-        }]
+            {
+                property: "Priority",
+                direction: "ascending"
+            },
+            {
+                property: "Daily Goal",
+                direction: "descending"
+            }]
     })
     return response.results;
 }
 
 async function getProjects() {
-    
+
     const response = await notion.databases.query({
         database_id: projectsDatabaseId,
     })
@@ -241,13 +222,12 @@ export {
     getEntriesForDate,
     createEntryForDate,
     didWeightsOnDayBefore,
-    completeRoutines,
-    setSleepTime,
     updateLifeWikiDayStrategy,
     updateDayStrategy,
     getChildBlocks,
     getAreas,
     getProjects,
     appendChildBlocks,
-    createProject
+    createProject,
+    updateProps
 }

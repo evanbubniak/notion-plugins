@@ -1,6 +1,6 @@
 
-import {appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, completeRoutines, setSleepTime, doesEntryHaveSleep, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
-import { currentDateWithOffset, addTimezoneOffset, millisecsPerDay, millisecsPerHour } from './date_format.js';
+import { doesEntryHaveSleep, updateProps, appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
+import { addTimezoneOffset, millisecsPerDay, millisecsPerHour, getTimezoneFormattedDateStr } from './date_format.js';
 import { createInterface } from 'readline';
 import _yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -62,47 +62,66 @@ async function getUserInput(prompt) {
     }))
 }
 
-async function populateEntryWithSleep(bedtimeString, waketimeString, currDate, entryId) {
+function makeSleepProps(bedtimeString, waketimeString, currDate) {
+    const bedtime = bedtimeString.substring(0, 4);
+    const waketime = waketimeString.substring(0, 4);
+    const bedtimeWasYesterday = (parseInt(bedtimeString) > parseInt(waketimeString));
     let wakeDate = new Date(currDate.getTime());
-    let bedtime;
-    let bedtimeWasYesterday;
-    let waketime;
-    bedtime = bedtimeString.substring(0, 4);
-    waketime = waketimeString.substring(0, 4);
-    bedtimeWasYesterday = (parseInt(bedtimeString) > parseInt(waketimeString));
     let sleepDate = bedtimeWasYesterday ? new Date(wakeDate.getTime() - millisecsPerDay) : new Date(wakeDate.getTime());
     sleepDate.setHours(parseInt(bedtime.substring(0, 2)), parseInt(bedtime.substring(2, 4)), 0, 0)
     wakeDate.setHours(parseInt(waketime.substring(0, 2)), parseInt(waketime.substring(2, 4)), 0, 0)
     sleepDate = new Date(sleepDate.getTime() - millisecsPerHour * sleepDate.getTimezoneOffset() / 60);
     wakeDate = new Date(wakeDate.getTime() - millisecsPerHour * wakeDate.getTimezoneOffset() / 60);
-    await setSleepTime(sleepDate, wakeDate, entryId);
+    return {
+        "Time in Bed": {
+            "date": {
+                "start": getTimezoneFormattedDateStr(sleepDate),
+                "end": getTimezoneFormattedDateStr(wakeDate),
+            }
+        }
+    };
+}
+
+function makeRoutineProps(routines) {
+    return routines.reduce((obj, routine) => ({ ...obj, [routine]: { checkbox: true } }), {});
 }
 
 const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
 const dayEntries = await getEntriesForDate(currDate);
-const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate);
 
-
-// print the blocks
-
+let propUpdates = {};
 if (argv.sleep !== '') {
-    populateEntryWithSleep(argv.sleep, argv.wake, currDate, dayEntry.id)
-} else {
-    if (!await doesEntryHaveSleep(dayEntry.id)) {
+    propUpdates = { ...propUpdates, ...makeSleepProps(argv.sleep, argv.wake, currDate) };
+}
+if (argv.routine.length > 0) {
+    propUpdates = { ...propUpdates, ...makeRoutineProps(argv.routine) };
+}
+
+let dayEntry;
+
+if (dayEntries.length !== 0) {
+    dayEntry = dayEntries[0];
+    if (!doesEntryHaveSleep(dayEntry)) {
         const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time, append y to end if it was yesterday)');
         const waketimeString = await getUserInput('when did you wake up?');
-        populateEntryWithSleep(bedtimeString, waketimeString, currDate, dayEntry.id);
+        propUpdates = { ...propUpdates, ...makeSleepProps(bedtimeString, waketimeString, currDate) };
     }
+    dayEntry = updateProps(dayEntry.id, propUpdates);
+} else {
+    if (argv.sleep === '') {
+        const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time, append y to end if it was yesterday)');
+        const waketimeString = await getUserInput('when did you wake up?');
+        propUpdates = { ...propUpdates, ...makeSleepProps(bedtimeString, waketimeString, currDate) };
+    }
+    dayEntry = await createEntryForDate(currDate, propUpdates);
 }
+
+// print the blocks
 
 if (argv.plan) {
     const plan = await getUserInput("What is your plan for the day?\n")
     updateLifeWikiDayStrategy(plan);
     updateDayStrategy(dayEntry.id, plan);
-}
-
-if (argv.routine.length > 0) {
-    completeRoutines(argv.routine, dayEntry.id);
 }
 
 if (argv.tasks.length > 0) {
@@ -114,7 +133,7 @@ if (argv.tasks.length > 0) {
             "object": "block",
             "type": "table_row",
             "table_row": {
-                "cells": task.split(",").map(taskComponent => [{"type": "text", "text": {"content": taskComponent}}])
+                "cells": task.split(",").map(taskComponent => [{ "type": "text", "text": { "content": taskComponent } }])
             }
         }
     });
