@@ -1,4 +1,4 @@
-import { doesEntryHaveSleep, getChildBlocks, didWeightsOnDayBefore, getEntriesForDate, createEntryForDate, getAreas, getProjects } from './notion_api.js'
+import { getMostRecentEntries, doesEntryHaveSleep, getChildBlocks, didWeightsOnDayBefore, getEntriesForDate, createEntryForDate, getAreas, getProjects } from './notion_api.js'
 import { addTimezoneOffset } from './date_format.js';
 import _yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -11,49 +11,71 @@ const argv = yargs
         type: 'string',
         default: '',
     })
+    .option('list', {
+        alias: 'l',
+        demandOption: false,
+        describe: "Print out a summary of the most recent days on record",
+        type: 'boolean',
+        default: false
+    })
     .argv
 
-const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
-const didWeightsOnDayBeforeDate = await didWeightsOnDayBefore(currDate);
-const dayEntries = await getEntriesForDate(currDate);
-const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate, {});
-const dayEntryChildBlocks = await getChildBlocks(dayEntry.id);
-const areas = await getAreas();
-const projects = await getProjects();
-const dayEntryTableChildren = await getChildBlocks(dayEntryChildBlocks[3].id);
-
-function getName(page) { return page.properties.Name.title[0].text.content }
-
-console.log(dayEntry.properties.Day.title[0].text.content)
-
-if (doesEntryHaveSleep(dayEntry)) {
-    console.log("Bedtime: " + new Date(Date.parse(dayEntry.properties["Time in Bed"].date.start)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    console.log("Wake time: " + new Date(Date.parse(dayEntry.properties["Time in Bed"].date.end)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-} else {
-    console.log("Sleep time not set or incompletely set");
+function getDayName(dayPage) { return dayPage.properties.Day.title[0].text.content};
+function getProjectName(projectPage) { return projectPage.properties.Name.title[0].text.content }
+function formatTime(time) {
+    return new Date(Date.parse(time)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+if (argv.list) {
+    const NUM_ENTRIES_TO_RETRIEVE = 5;
+    const mostRecentEntries = await getMostRecentEntries(NUM_ENTRIES_TO_RETRIEVE);
+    mostRecentEntries.forEach(entry => {
+        const finishedRoutines = Object.keys(entry.properties).filter(key => entry.properties[key].type === "checkbox" && entry.properties[key].checkbox).join(" ");
+        const entryStr = `${getDayName(entry)}: ${formatTime(entry.properties["Time in Bed"].date.start)} -> ${formatTime(entry.properties["Time in Bed"].date.end)} ${finishedRoutines}`;
+        console.log(entryStr);
+    })
+} else {
+    const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
+    const didWeightsOnDayBeforeDate = await didWeightsOnDayBefore(currDate);
+    const dayEntries = await getEntriesForDate(currDate);
+    const dayEntry = (dayEntries.length != 0) ? dayEntries[0] : await createEntryForDate(currDate, {});
+    const dayEntryChildBlocks = await getChildBlocks(dayEntry.id);
+    const areas = await getAreas();
+    const projects = await getProjects();
+    const dayEntryTableChildren = await getChildBlocks(dayEntryChildBlocks[3].id);
 
-// print day strat
-dayEntryChildBlocks.slice(0, 2).map(childBlock => {
-    if (childBlock[childBlock.type].text.length > 0) {
-        console.log(childBlock[childBlock.type].text[0].plain_text);
+    
+
+    console.log(getDayName(dayEntry))
+
+    if (doesEntryHaveSleep(dayEntry)) {
+        console.log("Bedtime: " + formatTime(dayEntry.properties["Time in Bed"].date.start));
+        console.log("Wake time: " + formatTime(dayEntry.properties["Time in Bed"].date.end));
+    } else {
+        console.log("Sleep time not set or incompletely set");
     }
-})
 
-Object.keys(dayEntry.properties).filter(key => dayEntry.properties[key].type === "checkbox" && !dayEntry.properties[key].checkbox).map(key => {
-    if (key !== "Weights" || !didWeightsOnDayBeforeDate) {
-        console.log(key + ": Not Done");
-    }
-})
+    // print day strat
+    dayEntryChildBlocks.slice(0, 2).forEach(childBlock => {
+        if (childBlock[childBlock.type].text.length > 0) {
+            console.log(childBlock[childBlock.type].text[0].plain_text);
+        }
+    })
+
+    Object.keys(dayEntry.properties).filter(key => dayEntry.properties[key].type === "checkbox" && !dayEntry.properties[key].checkbox).forEach(key => {
+        if (key !== "Weights" || !didWeightsOnDayBeforeDate) {
+            console.log(key + ": Not Done");
+        }
+    })
 
 
-const projectNameNotWorkedOnOnDay = (projectName) => !dayEntryTableChildren.some((child) => child.table_row.cells[0][0].text.content == projectName);
-const activeUnfinishedProjects = projects.filter(project => project.properties.Active.checkbox && !project.properties.Completed.checkbox);
+    const projectNameNotWorkedOnOnDay = (projectName) => !dayEntryTableChildren.some((child) => child.table_row.cells[0][0].text.content == projectName);
+    const activeUnfinishedProjects = projects.filter(project => project.properties.Active.checkbox && !project.properties.Completed.checkbox);
 
-areas.filter(area => area.properties["Daily Goal"].number > 0).filter(area => area.properties.Projects.relation.length !== 0).map(area => {
-    const areaActiveUnfinishedProjectNames = activeUnfinishedProjects.filter(project => project.properties.Area.relation.some(projectArea => projectArea.id === area.id)).map(getName).filter(projectNameNotWorkedOnOnDay);
-    if (areaActiveUnfinishedProjectNames.length > 0) {
-        const areaProjectsString = ": " + areaActiveUnfinishedProjectNames.join(", ");
-        console.log(area.properties.Name.title[0].text.content + " (" + area.properties["Daily Goal"].number.toString() + ")" + areaProjectsString);
-    }
-})
+    areas.filter(area => area.properties["Daily Goal"].number > 0).filter(area => area.properties.Projects.relation.length !== 0).forEach(area => {
+        const areaActiveUnfinishedProjectNames = activeUnfinishedProjects.filter(project => project.properties.Area.relation.some(projectArea => projectArea.id === area.id)).map(getProjectName).filter(projectNameNotWorkedOnOnDay);
+        if (areaActiveUnfinishedProjectNames.length > 0) {
+            const areaProjectsString = ": " + areaActiveUnfinishedProjectNames.join(", ");
+            console.log(area.properties.Name.title[0].text.content + " (" + area.properties["Daily Goal"].number.toString() + ")" + areaProjectsString);
+        }
+    })
+}

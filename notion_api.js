@@ -12,6 +12,18 @@ function doesEntryHaveSleep(dayEntry) {
     return dayEntry.properties.hasOwnProperty("Time in Bed") && dayEntry.properties["Time in Bed"].date !== null && dayEntry.properties["Time in Bed"].date.start.length !== 0 && dayEntry.properties["Time in Bed"].date.end.length !== 0;
 }
 
+async function getMostRecentEntries(num_entries) {
+    const response = await notion.databases.query({
+        database_id: calendarDatabaseId,
+        page_size: num_entries,
+        sorts: [{
+            property: "Date",
+            direction: "descending"
+        }]
+    });
+    return response.results;
+}
+
 async function getEntriesForDate(date) {
     try {
         const response = await notion.databases.query({
@@ -237,5 +249,6 @@ export {
     getProjects,
     appendChildBlocks,
     createProject,
-    updateProps
+    updateProps,
+    getMostRecentEntries
 }
