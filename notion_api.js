@@ -54,6 +54,13 @@ async function updateLifeWikiDayStrategy(newText) {
     updateBlockToText(dayStrategyBlockId, newText);
 }
 
+async function retrieveLifeWikiDayStrategy() {
+    const response = await notion.blocks.retrieve({
+        block_id: dayStrategyBlockId
+    });
+    return response.callout.text[0].text.content;
+}
+
 async function updateDayStrategy(dayEntryId, newText) {
     const dayBlocks = await getChildBlocks(dayEntryId);
     const strategyBlockId = dayBlocks[1].id;
@@ -222,6 +229,7 @@ export {
     getEntriesForDate,
     createEntryForDate,
     didWeightsOnDayBefore,
+    retrieveLifeWikiDayStrategy,
     updateLifeWikiDayStrategy,
     updateDayStrategy,
     getChildBlocks,

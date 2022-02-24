@@ -1,5 +1,5 @@
 
-import { doesEntryHaveSleep, updateProps, appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
+import { retrieveLifeWikiDayStrategy, doesEntryHaveSleep, updateProps, appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
 import { addTimezoneOffset, millisecsPerDay, millisecsPerHour, getTimezoneFormattedDateStr } from './date_format.js';
 import { createInterface } from 'readline';
 import _yargs from 'yargs';
@@ -49,6 +49,12 @@ const argv = yargs
         type: "array",
         default: [],
     })
+    .option('syncstrats', {
+        demandOption: false,
+        describe: "Set the day strategy to the value of the lifewiki day strategy",
+        type: "boolean",
+        default: false
+    })
     .argv
 
 async function getUserInput(prompt) {
@@ -63,8 +69,8 @@ async function getUserInput(prompt) {
 }
 
 function makeSleepProps(bedtimeString, waketimeString, currDate) {
-    const bedtime = bedtimeString.substring(0, 4);
-    const waketime = waketimeString.substring(0, 4);
+    const bedtime = bedtimeString.padStart(4, "0").substring(0, 4);
+    const waketime = waketimeString.padStart(4, "0").substring(0, 4);
     const bedtimeWasYesterday = (parseInt(bedtimeString) > parseInt(waketimeString));
     let wakeDate = new Date(currDate.getTime());
     let sleepDate = bedtimeWasYesterday ? new Date(wakeDate.getTime() - millisecsPerDay) : new Date(wakeDate.getTime());
@@ -100,14 +106,16 @@ let dayEntry;
 if (dayEntries.length !== 0) {
     dayEntry = dayEntries[0];
     if (!doesEntryHaveSleep(dayEntry)) {
-        const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time, append y to end if it was yesterday)');
+        const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time)');
         const waketimeString = await getUserInput('when did you wake up?');
         propUpdates = { ...propUpdates, ...makeSleepProps(bedtimeString, waketimeString, currDate) };
     }
-    dayEntry = updateProps(dayEntry.id, propUpdates);
+    if (Object.keys(propUpdates).length > 0) {
+        dayEntry = await updateProps(dayEntry.id, propUpdates);
+    }
 } else {
     if (argv.sleep === '') {
-        const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time, append y to end if it was yesterday)');
+        const bedtimeString = await getUserInput('When did you go to bed? (format: HHMM, 24-hour time)');
         const waketimeString = await getUserInput('when did you wake up?');
         propUpdates = { ...propUpdates, ...makeSleepProps(bedtimeString, waketimeString, currDate) };
     }
@@ -120,6 +128,11 @@ if (argv.plan) {
     const plan = await getUserInput("What is your plan for the day?\n")
     updateLifeWikiDayStrategy(plan);
     updateDayStrategy(dayEntry.id, plan);
+}
+
+if (argv.syncstrats) {
+    const plan = await retrieveLifeWikiDayStrategy();
+    updateDayStrategy(dayEntry.id, plan)
 }
 
 if (argv.tasks.length > 0) {
