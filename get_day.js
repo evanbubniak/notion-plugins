@@ -43,7 +43,7 @@ if (argv['list-days']) {
 } else if (argv['list-projects']) {
     const projects = await getProjects();
     const areas = await getAreas();
-    projects.forEach(project => {
+    projects.filter(project => !(project.properties.Completed.checkbox)).forEach(project => {
         const projectArea = areas.filter(area => area.id == project.properties.Area.relation[0].id)[0];
         const projectStr = `${getProjectName(projectArea)}: ${getProjectName(project)}`;
         console.log(projectStr);
