@@ -11,10 +11,16 @@ const argv = yargs
         type: 'string',
         default: '',
     })
-    .option('list', {
+    .option('list-days', {
         alias: 'l',
         demandOption: false,
         describe: "Print out a summary of the most recent days on record",
+        type: 'boolean',
+        default: false
+    })
+    .option('list-projects', {
+        demandOption: false,
+        describe: "Print out a summary of all projects",
         type: 'boolean',
         default: false
     })
@@ -25,7 +31,8 @@ function getProjectName(projectPage) { return projectPage.properties.Name.title[
 function formatTime(time) {
     return new Date(Date.parse(time)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
-if (argv.list) {
+
+if (argv['list-days']) {
     const NUM_ENTRIES_TO_RETRIEVE = 5;
     const mostRecentEntries = await getMostRecentEntries(NUM_ENTRIES_TO_RETRIEVE);
     mostRecentEntries.forEach(entry => {
@@ -33,7 +40,16 @@ if (argv.list) {
         const entryStr = `${getDayName(entry)}: ${formatTime(entry.properties["Time in Bed"].date.start)} -> ${formatTime(entry.properties["Time in Bed"].date.end)} ${finishedRoutines}`;
         console.log(entryStr);
     })
-} else {
+} else if (argv['list-projects']) {
+    const projects = await getProjects();
+    const areas = await getAreas();
+    projects.forEach(project => {
+        const projectArea = areas.filter(area => area.id == project.properties.Area.relation[0].id)[0];
+        const projectStr = `${getProjectName(projectArea)}: ${getProjectName(project)}`;
+        console.log(projectStr);
+    })
+}
+else {
     const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
     const didWeightsOnDayBeforeDate = await didWeightsOnDayBefore(currDate);
     const dayEntries = await getEntriesForDate(currDate);
@@ -42,8 +58,6 @@ if (argv.list) {
     const areas = await getAreas();
     const projects = await getProjects();
     const dayEntryTableChildren = await getChildBlocks(dayEntryChildBlocks[3].id);
-
-    
 
     console.log(getDayName(dayEntry))
 
