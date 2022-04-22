@@ -35,6 +35,12 @@ const argv = yargs
         type: 'array',
         default: [],
     })
+    .option('unset-routine', {
+        demandOption: false,
+        describe: 'Mark a routine as not completed for the day',
+        type: 'array',
+        default: [],
+    })
     .option('plan', {
         alias: 'p',
         demandOption: false,
@@ -88,8 +94,8 @@ function makeSleepProps(bedtimeString, waketimeString, currDate) {
     };
 }
 
-function makeRoutineProps(routines) {
-    return routines.reduce((obj, routine) => ({ ...obj, [routine]: { checkbox: true } }), {});
+function makeRoutineProps(routines, value) {
+    return routines.reduce((obj, routine) => ({ ...obj, [routine]: { checkbox: value } }), {});
 }
 
 const currDate = (argv.date === '') ? new Date() : addTimezoneOffset(new Date(argv.date));
@@ -98,7 +104,10 @@ if (argv.sleep !== '') {
     propUpdates = { ...propUpdates, ...makeSleepProps(argv.sleep, argv.wake, currDate) };
 }
 if (argv.routine.length > 0) {
-    propUpdates = { ...propUpdates, ...makeRoutineProps(argv.routine) };
+    propUpdates = { ...propUpdates, ...makeRoutineProps(argv.routine, true) };
+}
+if (argv["unset-routine"].length > 0) {
+    propUpdates = { ...propUpdates, ...makeRoutineProps(argv["unset-routine"], false) };
 }
 
 const dayEntries = await getEntriesForDate(currDate);
