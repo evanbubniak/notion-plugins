@@ -1,5 +1,7 @@
 import { Client } from "@notionhq/client"
 import { millisecsPerDay, dateToYYYYMMDD, dateToTitle } from './date_format.js'
+import dotenv from 'dotenv'
+dotenv.config()
 
 const notion = new Client({ auth: process.env.NOTION_KEY });
 const calendarDatabaseId = process.env.NOTION_CALENDAR_DATABASE_ID;
