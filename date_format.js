@@ -15,11 +15,20 @@ function dateToYYYYMMDD(date) {
     return '' + y + '-' + (m <= 9 ? '0' + m : m) + '-' + (d <= 9 ? '0' + d : d);
 }
 
-function dateToTitle(date) {
+function dateToMMDDYYYY(date) {
     const d = date.getDate();
     const m = date.getMonth() + 1; //Month from 0 to 11
     const y = date.getFullYear();
-    return '' + m + '/' + d + '/' + y + ' (' + (new Intl.DateTimeFormat('en-US', { weekday: "short" })).format(date) + ')';
+    return '' + m + '/' + d + '/' + y
+}
+
+function dateToShortWeekday(date) {
+    return (new Intl.DateTimeFormat('en-US', { weekday: "short" })).format(date)
+}
+
+function dateToTitle(date) {
+
+    return dateToYYYYMMDD(date) + ' (' + dateToShortWeekday(date) + ')';
 }
 
 function getTimezoneFormattedDateStr(date) {
