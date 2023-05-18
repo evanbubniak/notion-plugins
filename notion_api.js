@@ -17,6 +17,8 @@ const areasDatabaseId = process.env.NOTION_AREAS_DATABASE_ID
 const mainCycleId = process.env.NOTION_MAIN_CYCLE_ID
 const cycleTemplateId = process.env.NOTION_CYCLE_TEMPLATE_ID
 const notionTasksDatabaseId=process.env.NOTION_TASKS_DATABASE_ID
+const mainCyclePlannerBlockId = process.env.NOTION_MAIN_CYCLE_PLANNER_BLOCK_ID
+
 function doesEntryHaveSleep(dayEntry) {
     return dayEntry.properties.hasOwnProperty("Time in Bed") && dayEntry.properties["Time in Bed"].date !== null && dayEntry.properties["Time in Bed"].date.start.length !== 0 && dayEntry.properties["Time in Bed"].date.end.length !== 0;
 }
@@ -58,6 +60,11 @@ async function getChildBlocks(blockId) {
     return response.results;
 }
 
+async function getCyclePlannerTimeBlocks() {
+    const allTimeBlocks = await getChildBlocks(mainCyclePlannerBlockId);
+    return allTimeBlocks.slice(1)
+}
+
 async function appendChildBlocks(blockId, childBlocks) {
     const response = await notion.blocks.children.append({
         block_id: blockId,
@@ -67,7 +74,6 @@ async function appendChildBlocks(blockId, childBlocks) {
 }
 
 async function getNewDayTemplateBlocks() {
-
     return await getChildBlocks(newDayTemplateId);
 }
 
@@ -81,10 +87,20 @@ async function getCycleMainFullTodo() {
         const response = await notion.databases.query({
             database_id: notionTasksDatabaseId,
             filter: {
-                "property": "Done",
-                "checkbox": {
-                    "equals": false
-                }
+                "or": [
+                    {
+                        "property": "Done",
+                        "checkbox": {
+                            "equals": false
+                        }
+                    },
+                    {
+                        "property": "Cycle",
+                        "checkbox": {
+                            "equals": true
+                        }
+                    }
+                ]
             }
         })
         return response.results
@@ -381,5 +397,6 @@ export {
     getCycleMainDayTasks,
     getPropFromBlockId,
     appendBlocksFromOnePageToAnother,
-    copyDayCycleTemplateToPage
+    copyDayCycleTemplateToPage,
+    getCyclePlannerTimeBlocks
 }

@@ -5,7 +5,7 @@
 // take a day as input, create it if it does not exist, and then transfer the cycle data to it and reset the cycle
 
 
-import { copyDayCycleTemplateToPage, getPropFromBlockId, getCycleMainDayTasks, getCycleMainFullTodo, getCycleMainBlocks, retrieveLifeWikiDayStrategy, doesEntryHaveSleep, updateProps, appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
+import { getCyclePlannerTimeBlocks, copyDayCycleTemplateToPage, getPropFromBlockId, getCycleMainDayTasks, getCycleMainFullTodo, getCycleMainBlocks, retrieveLifeWikiDayStrategy, doesEntryHaveSleep, updateProps, appendChildBlocks, updateDayStrategy, getEntriesForDate, createEntryForDate, updateLifeWikiDayStrategy, getChildBlocks } from './notion_api.js'
 import { addTimezoneOffset, millisecsPerDay, millisecsPerHour, getTimezoneFormattedDateStr } from './date_format.js';
 import { createInterface } from 'readline';
 import _yargs from 'yargs';
@@ -103,5 +103,8 @@ for (let ii = 0; ii < properties.length; ii++) {
 const dayEntryChildBlocks = await getChildBlocks(dayEntry.id);
 const dayEntryTableBlock1 = (await getChildBlocks(dayEntryChildBlocks[0].id))[0]
 const dayEntryTableBlock2 = dayEntryChildBlocks[1]
+const dayEntryTableBlock3 = dayEntryChildBlocks[2]
 appendChildBlocks(dayEntryTableBlock1.id, todoTableRows)
 appendChildBlocks(dayEntryTableBlock2.id, cycleTableRows)
+const cyclePlannerTimeBlocks = await getCyclePlannerTimeBlocks()
+appendChildBlocks(dayEntryTableBlock3.id, cyclePlannerTimeBlocks)
